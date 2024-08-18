@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using Unity.VisualScripting;
 using UnityEngine;
+using UnityEngine.Windows.Speech;
 
 public class PlayerMove : MonoBehaviour
 {
@@ -11,53 +12,44 @@ public class PlayerMove : MonoBehaviour
     [SerializeField]
     private float _speedX;
     [SerializeField]
-    private float _speedY;
-    [SerializeField]
     private int _direction; //1 or -1
-    [Space]
-    [SerializeField]
-    private float _jumpForcce;
-    [SerializeField]
-    private ForceMode _jumpForceMode;
+
     [Space]
     [SerializeField]
     private LayerMask _layerMaskCheck;
     [SerializeField]
     private float _maxDistanceBoxCast;
     [SerializeField]
-    private bool _isGroundCheck;
+    private bool _isBottomCheck;
     [SerializeField]
     private bool _isLeftCheck;
     [SerializeField]
     private bool _isRightCheck;
+    [SerializeField]
+    private bool _isTopCheck;
 
     private Rigidbody _rb;
     private Transform _leftCheckPoint;
     private Transform _rightCheckPoint;
-    private Transform _groundCheckPoint;
+    private Transform _bottomCheckPoint;
+    private Transform _topCheckPoint;
 
     private void Start()
     {
         _rb = GetComponent<Rigidbody>();
         _direction = 1;
 
-        SetCheckColliders();
+        SetCheckPoints();
     }
 
     private void Update()
     {
-        if (Input.GetKeyDown("space"))
-        {
-            Jump();
-        }
-
-        UpdateGroundCheck();
+        UpdateGroundLeftRightCheck();
     }
 
     private void FixedUpdate()
     {
         UpdateVelocityX();
-        //UpdateVelocityY();
     }
 
     private void UpdateVelocityX()
@@ -69,28 +61,15 @@ public class PlayerMove : MonoBehaviour
         _rb.velocity = new Vector3(x, y, z);
     }
 
-    private void UpdateVelocityY()
+    private void UpdateGroundLeftRightCheck()
     {
-        var x = _rb.velocity.y;
-        var y = _speedY * _speedRaising * Time.fixedDeltaTime;
-        var z = _rb.velocity.z;
-
-        _rb.velocity = new Vector3(x, y, z);
+        UpdateGroundLeftRightCheck(_leftCheckPoint, ref _isLeftCheck);
+        UpdateGroundLeftRightCheck(_rightCheckPoint, ref _isRightCheck);
+        UpdateGroundLeftRightCheck(_bottomCheckPoint, ref _isBottomCheck);
+        UpdateGroundLeftRightCheck(_topCheckPoint, ref _isTopCheck);
     }
 
-    private void Jump()
-    {
-        _rb.AddForce(new Vector3(0f, _jumpForcce, 0f), _jumpForceMode);
-    }
-
-    private void UpdateGroundCheck()
-    {
-        UpdateGroundCheck(_leftCheckPoint, ref _isLeftCheck);
-        UpdateGroundCheck(_rightCheckPoint, ref _isRightCheck);
-        UpdateGroundCheck(_groundCheckPoint, ref _isGroundCheck);
-    }
-
-    private void UpdateGroundCheck(Transform _checkPoint, ref bool _isGroundParam)
+    private void UpdateGroundLeftRightCheck(Transform _checkPoint, ref bool _isGroundParam)
     {
         var heading = _checkPoint.position - transform.position;
         var distance = heading.magnitude;
@@ -100,34 +79,58 @@ public class PlayerMove : MonoBehaviour
         var y = _shiftFromCenterForCheckDistance * direction.y;
         var z = _shiftFromCenterForCheckDistance * direction.z;
         var center = transform.position - new Vector3(x, y, z); //отодвигаю центр пуска квадрата, чтобы он не пролетал стену, когда игрок с ней соприкасается
-        var halfExtends = transform.localScale * 0.5f;
+        var halfExtends = transform.localScale * 0.45f;
 
         _isGroundParam = Physics.BoxCast(center, halfExtends, direction, transform.rotation, _maxDistanceBoxCast, _layerMaskCheck);
     }
 
-    private void SetCheckColliders()
+    private void SetCheckPoints()
     {
         var childCount = transform.childCount;
 
         for (int i = 0; i < childCount; i++)
         {
             var child = transform.GetChild(i);
-            var checkCollider = child.GetComponent<PlayerCheckCollider>();
-            if (checkCollider != null)
+            var checkPoint = child.GetComponent<CheckPoint>();
+            if (checkPoint != null)
             {
-                if (checkCollider.GerCheckSide() == CheckSide.Left)
+                if (checkPoint.GetCheckSide() == CheckSide.Left)
                 {
-                    _leftCheckPoint = checkCollider.transform;
+                    _leftCheckPoint = checkPoint.transform;
                 }
-                else if (checkCollider.GerCheckSide() == CheckSide.Right)
+                else if (checkPoint.GetCheckSide() == CheckSide.Right)
                 {
-                    _rightCheckPoint = checkCollider.transform;
+                    _rightCheckPoint = checkPoint.transform;
                 }
-                else if (checkCollider.GerCheckSide() == CheckSide.Ground)
+                else if (checkPoint.GetCheckSide() == CheckSide.Bottom)
                 {
-                    _groundCheckPoint = checkCollider.transform;
+                    _bottomCheckPoint = checkPoint.transform;
+                }
+                else if (checkPoint.GetCheckSide() == CheckSide.Top)
+                {
+                    _topCheckPoint = checkPoint.transform;
                 }
             }
         }
+    }
+
+    public void ChangeDirection()
+    {
+        _direction *= -1;
+    }
+
+    public bool IsTouchBottom()
+    {
+        return _isBottomCheck;
+    }
+
+    public bool IsTouchTop()
+    {
+        return _isTopCheck;
+    }
+
+    public bool IsTouchWall()
+    {
+        return _isLeftCheck || _isRightCheck;
     }
 }

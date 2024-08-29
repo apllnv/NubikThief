@@ -21,6 +21,8 @@ public class JumpVelocity : MonoBehaviour
     [Space]
     [SerializeField]
     private float _velocitysSmoothTime;
+    [SerializeField]
+    private float _velocityChangeMaxSpeed;
 
     private Vector3 _velocity;
     private PlayerMove playerMove;
@@ -32,6 +34,7 @@ public class JumpVelocity : MonoBehaviour
         playerMove = GetComponent<PlayerMove>();
 
         _gravityDirection = 1;
+        ChangeVelocity(0);
     }
 
     private void Update()
@@ -66,9 +69,8 @@ public class JumpVelocity : MonoBehaviour
     {
         var startVelocity = _rb.velocity;
         var endVelocity = new Vector3(_rb.velocity.x, velocity * _gravityDirection, _rb.velocity.z);
-        Vector3.SmoothDamp(startVelocity, endVelocity, ref _velocity, _velocitysSmoothTime);
+        Vector3.SmoothDamp(startVelocity, endVelocity, ref _velocity, _velocitysSmoothTime, _velocityChangeMaxSpeed);
     }
-
 
     private void IsJumping()
     {

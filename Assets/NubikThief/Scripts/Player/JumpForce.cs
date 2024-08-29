@@ -45,7 +45,7 @@ public class JumpForce : MonoBehaviour
         _rb = GetComponent<Rigidbody>();
         _playerMove = GetComponent<PlayerMove>();
         _jumpForce = Mathf.Sqrt(_jumpHeight * -2 * (Physics.gravity.y));
-        _gravityDirection = -1;
+        _gravityDirection = 1;
     }
 
     void Update()
@@ -68,15 +68,21 @@ public class JumpForce : MonoBehaviour
 
     private void Jump()
     {
-        if (_playerMove.IsTouchBottom() || ((Time.time - _lastTouchGroundTime <= _kayoteTime) && !_playerMove.IsTouchWall()))
+        bool normalGravityCondition = (_playerMove.IsTouchBottom() || ((Time.time - _lastTouchGroundTime <= _kayoteTime)
+        && !_playerMove.IsTouchWall())) && _gravityDirection == 1;
+
+        bool invertedGravityCondition = (_playerMove.IsTouchTop() || ((Time.time - _lastTouchGroundTime <= _kayoteTime)
+        && !_playerMove.IsTouchWall())) && _gravityDirection == -1;
+
+        if (normalGravityCondition || invertedGravityCondition)
         {
             _rb.velocity = new Vector3(_rb.velocity.x, 0f, _rb.velocity.z);
-            _rb.AddForce(new Vector3(0, _jumpForce, 0), ForceMode.Impulse);
+            _rb.AddForce(new Vector3(0, _jumpForce * _gravityDirection, 0), ForceMode.Impulse);
         }
         else if (_playerMove.IsTouchWall())
         {
             _rb.velocity = new Vector3(_rb.velocity.x, 0f, _rb.velocity.z);
-            _rb.AddForce(new Vector3(0, _jumpForce, 0), ForceMode.Impulse);
+            _rb.AddForce(new Vector3(0, _jumpForce * _gravityDirection, 0), ForceMode.Impulse);
 
             _playerMove.ChangeDirection();
         }
@@ -84,7 +90,7 @@ public class JumpForce : MonoBehaviour
 
     private void CheckLastTouchGroundTime()
     {
-        if (_playerMove.IsTouchBottom())
+        if ((_playerMove.IsTouchBottom() && _gravityDirection == 1) || (_playerMove.IsTouchTop() && _gravityDirection == -1))
         {
             _lastTouchGroundTime = Time.time;
         }
@@ -92,11 +98,11 @@ public class JumpForce : MonoBehaviour
 
     private void Slide()
     {
-        if (_playerMove.IsTouchWall() && _rb.velocity.y < 0f)
+        if (_playerMove.IsTouchWall() && _rb.velocity.y * _gravityDirection < 0f)
         {
             if (_rb.velocity.y > _maxSlideSpeed)
             {
-                _rb.AddForce(new Vector3(0, _slideForce, 0), ForceMode.Force);
+                _rb.AddForce(new Vector3(0, _slideForce * _gravityDirection, 0), ForceMode.Force);
             }
 
             _isSlide = true;
@@ -109,9 +115,10 @@ public class JumpForce : MonoBehaviour
 
     private void Fall()
     {
-        if (!_playerMove.IsTouchBottom() && !_playerMove.IsTouchWall() && _rb.velocity.y < 0f)
+        if (!_playerMove.IsTouchBottom() && !_playerMove.IsTouchTop() && !_playerMove.IsTouchWall()
+        && _rb.velocity.y * _gravityDirection < 0f)
         {
-            _rb.AddForce(new Vector3(0, _fallForce, 0), ForceMode.Force);
+            _rb.AddForce(new Vector3(0, _fallForce * _gravityDirection, 0), ForceMode.Force);
             _isFall = true;
         }
         else
@@ -124,8 +131,8 @@ public class JumpForce : MonoBehaviour
     {
         if (_isSlide)
         {
-            float speed = Mathf.Max(_maxSlideSpeed, _rb.velocity.y);
-            _rb.velocity = new Vector3(_rb.velocity.x, speed, _rb.velocity.z);
+            float speed = Mathf.Max(_maxSlideSpeed, _rb.velocity.y * _gravityDirection);
+            _rb.velocity = new Vector3(_rb.velocity.x, speed * _gravityDirection, _rb.velocity.z);
         }
     }
 
@@ -133,15 +140,14 @@ public class JumpForce : MonoBehaviour
     {
         if (_isFall)
         {
-            float speed = Mathf.Max(_maxFallSpeed, _rb.velocity.y);
-            _rb.velocity = new Vector3(_rb.velocity.x, speed, _rb.velocity.z);
+            float speed = Mathf.Max(_maxFallSpeed, _rb.velocity.y * _gravityDirection);
+            _rb.velocity = new Vector3(_rb.velocity.x, speed * _gravityDirection, _rb.velocity.z);
         }
     }
 
     private void ChangeGravityDirection()
     {
         _gravityDirection *= -1;
+        Physics.gravity = new Vector3(Physics.gravity.x, Physics.gravity.y * -1, Physics.gravity.z);
     }
-
-
 }

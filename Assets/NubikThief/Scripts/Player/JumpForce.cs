@@ -1,6 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
-using Unity.VisualScripting;
 using UnityEngine;
 
 public class JumpForce : MonoBehaviour
@@ -18,38 +15,28 @@ public class JumpForce : MonoBehaviour
     private float _maxSlideSpeed;
     [SerializeField]
     private float _kayoteTime;
+
     private Rigidbody _rb;
     private PlayerMove _playerMove;
-
-    private bool _isSlide;
-    private bool _isFall;
-
+    private bool _isJumping;
+    public bool _isSlide;
+    public bool _isFall;
     private float _lastTouchGroundTime;
-
     private float _jumpForce;
-
     private int _gravityDirection;
 
-    private void OnDisable()
-    {
-        EventBus.OnChangeGravityDirection += ChangeGravityDirection;
-    }
-
-    private void OnEnable()
-    {
-        EventBus.OnChangeGravityDirection += ChangeGravityDirection;
-    }
 
     private void Start()
     {
         _rb = GetComponent<Rigidbody>();
         _playerMove = GetComponent<PlayerMove>();
         _jumpForce = Mathf.Sqrt(_jumpHeight * -2 * (Physics.gravity.y));
-        _gravityDirection = 1;
     }
 
     void Update()
     {
+        SetGravityDirection();
+
         if (Input.GetKeyDown("space"))
         {
             Jump();
@@ -68,32 +55,40 @@ public class JumpForce : MonoBehaviour
 
     private void Jump()
     {
-        bool normalGravityCondition = (_playerMove.IsTouchBottom() || ((Time.time - _lastTouchGroundTime <= _kayoteTime)
-        && !_playerMove.IsTouchWall())) && _gravityDirection == 1;
+        bool normalGravityCondition = _playerMove.IsTouchGround() || ((Time.time - _lastTouchGroundTime <= _kayoteTime)
+        && !_playerMove.IsTouchWall());
 
-        bool invertedGravityCondition = (_playerMove.IsTouchTop() || ((Time.time - _lastTouchGroundTime <= _kayoteTime)
-        && !_playerMove.IsTouchWall())) && _gravityDirection == -1;
+        bool invertedGravityCondition = _playerMove.IsTouchGround() || ((Time.time - _lastTouchGroundTime <= _kayoteTime)
+        && !_playerMove.IsTouchWall());
 
         if (normalGravityCondition || invertedGravityCondition)
         {
             _rb.velocity = new Vector3(_rb.velocity.x, 0f, _rb.velocity.z);
-            _rb.AddForce(new Vector3(0, _jumpForce * _gravityDirection, 0), ForceMode.Impulse);
+            _rb.AddForce(new Vector3(0, _jumpForce * _playerMove.GravityDirection, 0), ForceMode.Impulse);
+            _isJumping = true;
+
+            EventBus.OnAnimatorSetBool?.Invoke(PlayerAnimatorParamentsNames.JUMP, _isJumping);
         }
         else if (_playerMove.IsTouchWall())
         {
             _rb.velocity = new Vector3(_rb.velocity.x, 0f, _rb.velocity.z);
-            _rb.AddForce(new Vector3(0, _jumpForce * _gravityDirection, 0), ForceMode.Impulse);
+            _rb.AddForce(new Vector3(0, _jumpForce * _playerMove.GravityDirection, 0), ForceMode.Impulse);
+            _isJumping = true;
 
-            _playerMove.ChangeDirection();
+            EventBus.OnPlayerChangeDirection?.Invoke();
+            EventBus.OnAnimatorSetBool?.Invoke(PlayerAnimatorParamentsNames.JUMP, _isJumping);
         }
     }
 
     private void CheckLastTouchGroundTime()
     {
-        if ((_playerMove.IsTouchBottom() && _gravityDirection == 1) || (_playerMove.IsTouchTop() && _gravityDirection == -1))
+        bool isTouchGround = _playerMove.IsTouchGround();
+        if (isTouchGround)
         {
             _lastTouchGroundTime = Time.time;
         }
+
+        EventBus.OnAnimatorSetBool?.Invoke(PlayerAnimatorParamentsNames.RUN, isTouchGround);
     }
 
     private void Slide()
@@ -106,24 +101,33 @@ public class JumpForce : MonoBehaviour
             }
 
             _isSlide = true;
+            _isJumping = false;
+
+            EventBus.OnAnimatorSetBool?.Invoke(PlayerAnimatorParamentsNames.SLIDE, _isSlide);
+            EventBus.OnAnimatorSetBool?.Invoke(PlayerAnimatorParamentsNames.JUMP, _isJumping);
         }
         else
         {
             _isSlide = false;
+            EventBus.OnAnimatorSetBool?.Invoke(PlayerAnimatorParamentsNames.SLIDE, _isSlide);
         }
     }
 
     private void Fall()
     {
-        if (!_playerMove.IsTouchBottom() && !_playerMove.IsTouchTop() && !_playerMove.IsTouchWall()
-        && _rb.velocity.y * _gravityDirection < 0f)
+        if (!_playerMove.IsTouchGround() && !_playerMove.IsTouchWall() && _rb.velocity.y * _gravityDirection < 0f)
         {
             _rb.AddForce(new Vector3(0, _fallForce * _gravityDirection, 0), ForceMode.Force);
             _isFall = true;
+            _isJumping = false;
+
+            EventBus.OnAnimatorSetBool?.Invoke(PlayerAnimatorParamentsNames.FALL, _isFall);
+            EventBus.OnAnimatorSetBool?.Invoke(PlayerAnimatorParamentsNames.JUMP, _isJumping);
         }
         else
         {
             _isFall = false;
+            EventBus.OnAnimatorSetBool?.Invoke(PlayerAnimatorParamentsNames.FALL, _isFall);
         }
     }
 
@@ -145,9 +149,8 @@ public class JumpForce : MonoBehaviour
         }
     }
 
-    private void ChangeGravityDirection()
+    private void SetGravityDirection()
     {
-        _gravityDirection *= -1;
-        Physics.gravity = new Vector3(Physics.gravity.x, Physics.gravity.y * -1, Physics.gravity.z);
+        _gravityDirection = _playerMove.GravityDirection;
     }
 }
